@@ -5,38 +5,34 @@
     .DESCRIPTION
     Get security policy settings being read from Local Security Policy using secedit.exe
 
-    .PARAMETER All
-    Get all settings from all sections
-
-    .PARAMETER SystemAccess
-    Get specific setting from System Access section
-
-    .PARAMETER EventAudit
-    Get specific setting from Event Audit section
-
     .EXAMPLE
-    Get-SecurityPolicy -Verbose -All
-
-    .EXAMPLE
-    Get-SecurityPolicy -SystemAccess LockoutBadCount
-
-    .EXAMPLE
-    Get-SecurityPolicy -SystemAccess MinimumPasswordLength
+    Get-SecurityPolicy
 #>
 function Get-SecurityPolicy {
     [CmdletBinding()]
     param (
-
+        # Specifies the path and file name of the log file to be used in the process
+        [Parameter()]
+        [System.String]
+        $LogPath
     )
 
     try {
         $filePath = (New-TemporaryFile -ErrorAction Stop).FullName
+        $seceditArgs = @(
+            '/export'
+            '/cfg "{0}"' -f $filePath
+        )
+        if ($LogPath) {
+            $seceditArgs += '/log "{0}"' -f $LogPath
+        }
+
         $pinfo = [System.Diagnostics.ProcessStartInfo]::new()
         $pinfo.FileName = 'secedit.exe'
         $pinfo.RedirectStandardError = $true
         $pinfo.RedirectStandardOutput = $true
         $pinfo.UseShellExecute = $false
-        $pinfo.Arguments = '/export /cfg "{0}"' -f $filePath
+        $pinfo.Arguments = $seceditArgs -join ' '
         $proc = [System.Diagnostics.Process]::new()
         $proc.StartInfo = $pinfo
         $null = $proc.Start()
@@ -45,10 +41,6 @@ function Get-SecurityPolicy {
 
         if ($output -notlike '*task has completed successfully*') {
             throw $output
-
-
-            Write-Warning -Message ('Failed to export security policy: {0}' -f $output)
-            return
         }
 
         $index = 0
